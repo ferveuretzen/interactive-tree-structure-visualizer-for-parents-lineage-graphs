@@ -37,26 +37,38 @@
             if (typeof cytoscapeConfig !== 'undefined') {
                 console.log("元の設定データ:", cytoscapeConfig);
 
-                // 💡 Dashのダンプデータから、純粋なノードと線のデータを救出する
-                // データの階層（propsの中など）に合わせて自動で探索します
-                const rawElements = cytoscapeConfig.elements ||
-                    (cytoscapeConfig.props && cytoscapeConfig.props.elements) ||
-                    cytoscapeConfig.data || [];
+                // 💡 配列（Array）の1番目、またはデータの中から elements を確実に救出する
+                let rawElements = [];
 
-                // 🎨 JavaScript側で、見た目（スタイル）を強制的に再定義する
-                // （点の色を青、文字を黒、線をグレーに設定）
+                if (Array.isArray(cytoscapeConfig)) {
+                    // 配列の場合：1番目の要素（cytoscapeConfig[0]）にelementsが入っているケースがほとんどです
+                    rawElements = cytoscapeConfig[0].elements || cytoscapeConfig[0] || [];
+                } else {
+                    // オブジェクトの場合
+                    rawElements = cytoscapeConfig.elements || (cytoscapeConfig.props && cytoscapeConfig.props.elements) || [];
+                }
+
+                // もし救出したデータがまだオブジェクトの中に隠れていたら、さらに一段剥く
+                if (rawElements.elements) {
+                    rawElements = rawElements.elements;
+                }
+
+                // 🎨 JavaScript側で見た目（スタイル）を綺麗に定義し直す
                 const defaultStylesheet = [
                     {
                         selector: 'node',
                         style: {
                             'background-color': '#0074D9',
-                            'label': 'data(label)', // ノードに文字を表示
+                            'label': 'data(label)', // 家系図の名前（ラベル）を表示
                             'color': '#000000',
-                            'width': '30px',
-                            'height': '30px',
+                            'width': '40px',
+                            'height': '40px',
                             'font-size': '12px',
                             'text-valign': 'center',
-                            'text-halign': 'panel'
+                            'text-halign': 'center', // ⚠️ panel から center に修正してエラーを解消
+                            'background-opacity': 0.8,
+                            'border-width': 2,
+                            'border-color': '#0056b3'
                         }
                     },
                     {
@@ -65,7 +77,7 @@
                             'width': 2,
                             'line-color': '#999',
                             'target-arrow-color': '#999',
-                            'target-arrow-shape': 'triangle',
+                            'target-arrow-shape': 'triangle', // 親から子への矢印
                             'curve-style': 'bezier'
                         }
                     }
@@ -75,24 +87,26 @@
                 const cleanConfig = {
                     container: document.getElementById('cy'),
                     elements: rawElements,
-                    style: defaultStylesheet, // 壊れたスタイルの代わりに上記を適用
+                    style: defaultStylesheet,
                     layout: {
-                        name: 'cose', // 自動で綺麗に分散配置するレイアウト
+                        name: 'cose', // 自動できれいに家系図を分散・整理して配置するレイアウト
                         animate: false
                     }
                 };
 
                 // グラフを描画
                 const cy = cytoscape(cleanConfig);
+
+                // 画面中央にピタッと収める
                 cy.fit();
+                cy.center();
 
                 console.log("クリーンアップ後の描画を実行しました。要素数:", cy.elements().length);
 
-                if (cy.elements().length === 0) {
-                    console.error("エラー: ノードや線のデータ（elements）が見つかりませんでした。データ構造の確認が必要です。");
-                }
-
-                window.addEventListener('resize', () => { cy.fit(); });
+                window.addEventListener('resize', () => {
+                    cy.resize();
+                    cy.fit();
+                });
             }
         });
     </script>
