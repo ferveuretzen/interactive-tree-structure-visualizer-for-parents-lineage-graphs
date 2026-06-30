@@ -4,71 +4,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cytoscape Graph</title>
-    <script src="cytoscape.min.js"></script>
+    <title>家系図アーカイブ</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #ffffff;
+            font-family: sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
         }
 
-        #cy {
-            width: 100%;
-            height: 100%;
-            display: block;
+        h1 {
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 15px;
+        }
+
+        a {
+            font-weight: bold;
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 
 <body>
 
-    <div id="cy"></div>
-    <script src="graph_config.js"></script>
+    <h1>横溝正史作品 家系図一覧</h1>
+    <p>PythonのDash Cytoscapeで生成した、作品ごとのインタラクティブな家系図です。クリックすると拡大縮小可能なビューアーが開きます。</p>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const config = cytoscapeConfig || {};
-            const configProps = config.props || {};
+    <ul>
+        <li>
+            <a href="viewer.html?graph=inugami">犬神家の一族 完全版家系図</a><br>
+            <span>犬神佐兵衛の遺言状から始まる、犬神家・青沼家の複雑な血縁関係をまとめた完全版です。</span>
+        </li>
+        <li>
+            <a href="viewer.html?graph=aonuma">青沼家 簡易版家系図</a><br>
+            <span>青沼菊乃と静馬の系統に絞って見やすく配置した簡易的な家系図です。</span>
+        </li>
+        <!-- 今後、新しい家系図が増えたらここに <li> リンクを1行足すだけ -->
+    </ul>
 
-            let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
-            let convertedStyle = rawStylesheet.map(item => {
-                let dashStyle = item.style || item.css || {};
-                const finalStyle = {};
-
-                Object.keys(dashStyle).forEach(key => {
-                    if (key === 'content') {
-                        finalStyle['label'] = dashStyle[key];
-                    } else {
-                        finalStyle[key] = dashStyle[key];
-                    }
-                });
-
-                return {
-                    selector: item.selector,
-                    style: finalStyle
-                };
-            });
-
-            const cy = cytoscape({
-                container: document.getElementById('cy'),
-                elements: configProps.elements || config.elements || [],
-                style: convertedStyle,
-                layout: { name: 'preset' },
-                zoomingEnabled: true,
-                userZoomingEnabled: true,
-                panningEnabled: true,
-                userPanningEnabled: true,
-                boxSelectionEnabled: false,
-                autounselectify: true
-            });
-
-            cy.fit(50);
-        });
-    </script>
 </body>
 
 </html>
