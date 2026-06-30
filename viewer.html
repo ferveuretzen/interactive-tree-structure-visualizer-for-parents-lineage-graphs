@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家系図表示</title>
+    <script src="cytoscape.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: sans-serif;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #back-link {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            text-decoration: none;
+            color: #333;
+            font-size: 13px;
+        }
+
+        #back-link:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <a id="back-link" href="index.html">← 一覧に戻る</a>
+    <div id="cy"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const graphName = urlParams.get('graph');
+
+            if (!graphName || !/^[a-zA-Z0-9_-]+$/.test(graphName)) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.title = `${graphName} - 家系図表示`;
+
+            const script = document.createElement('script');
+            script.src = `${graphName}_graph_config.js`;
+
+            script.onload = function () {
+                if (typeof cytoscapeConfig === 'undefined') {
+                    alert("データの読み込みに失敗しました。");
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                const config = cytoscapeConfig || {};
+                const configProps = config.props || {};
+
+                let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
+                let convertedStyle = rawStylesheet.map(item => {
+                    let dashStyle = item.style || item.css || {};
+                    const finalStyle = {};
+                    Object.keys(dashStyle).forEach(key => {
+                        if (key === 'content') {
+                            finalStyle['label'] = dashStyle[key];
+                        } else {
+                            finalStyle[key] = dashStyle[key];
+                        }
+                    });
+                    return { selector: item.selector, style: finalStyle };
+                });
+
+                const cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: configProps.elements || config.elements || [],
+                    style: convertedStyle,
+                    layout: { name: 'preset' },
+                    zoomingEnabled: true,
+                    userZoomingEnabled: true,
+                    panningEnabled: true,
+                    userPanningEnabled: true,
+                    boxSelectionEnabled: false,
+                    autounselectify: true
+                });
+
+                cy.fit(50);
+            };
+
+            document.head.appendChild(script);
+        });
+    </script>
+</body>
+
+</html>
