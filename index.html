@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cytoscape Debug</title>
+    <title>Cytoscape Graph</title>
+    <!-- 保存したローカルファイルを読み込み -->
     <script src="cytoscape.min.js"></script>
     <style>
         body {
@@ -13,7 +14,7 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            font-family: sans-serif;
+            background-color: #ffffff;
         }
 
         #cy {
@@ -21,104 +22,76 @@
             height: 100%;
             display: block;
         }
-
-        /* 画面上部に診断結果を表示するパネル */
-        #debug-panel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 9999;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ff00;
-            padding: 15px;
-            border-radius: 5px;
-            font-size: 13px;
-            max-width: 90vw;
-            overflow-x: auto;
-        }
-
-        .error {
-            color: #ff3333;
-            font-weight: bold;
-        }
     </style>
 </head>
 
 <body>
-
-    <div id="debug-panel">
-        <div>🔍 【データ読み込み診断状況】</div>
-        <div id="check-config">・graph_config.js の読み込み: 判定中...</div>
-        <div id="check-elements">・検出された要素（ノード・エッジ）数: 判定中...</div>
-        <div id="check-styles">・検出されたスタイル数: 判定中...</div>
-        <div id="check-raw-selector">・データ内の最初のセレクタ名: 判定中...</div>
-    </div>
 
     <div id="cy"></div>
     <script src="graph_config.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const logConfig = document.getElementById('check-config');
-            const logElements = document.getElementById('check-elements');
-            const logStyles = document.getElementById('check-styles');
-            const logSelector = document.getElementById('check-raw-selector');
-
-            // 1. そもそもファイルが読み込めているかチェック
-            if (typeof cytoscapeConfig === 'undefined') {
-                logConfig.innerHTML = '❌ graph_config.js が読み込めていません（変数未定義）';
-                logConfig.className = 'error';
-                return;
-            }
-            logConfig.innerHTML = '✅ graph_config.js の読み込み成功！';
-
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 2. 要素数のチェック
+            // 1. エレメント（ノード・エッジ）の抽出
             let rawElements = configProps.elements || config.elements || [];
-            logElements.innerHTML = `✅ 要素数: ${rawElements.length} 個（ノードとエッジの合計）`;
 
-            // 3. スタイルシートのチェック
+            // 2. スタイルシートの抽出と、優先度（詳細度）の強制引き上げ処理
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
-            logStyles.innerHTML = `✅ スタイル数: ${rawStylesheet.length} 個`;
+            let convertedStylesheet = [];
 
-            if (rawStylesheet.length > 0) {
-                logSelector.innerHTML = `✅ 最初のセレクタ: "${rawStylesheet[0].selector}"`;
-            } else {
-                logSelector.innerHTML = '❌ スタイルが0個、または格納場所が違います';
-                logSelector.className = 'error';
+            if (Array.isArray(rawStylesheet)) {
+                convertedStylesheet = rawStylesheet.map((item, index) => {
+                    let dashStyle = item.style || item.css || {};
+
+                    if (typeof dashStyle === 'string') {
+                        try { dashStyle = JSON.parse(dashStyle); } catch (e) { dashStyle = {}; }
+                    }
+
+                    const finalStyle = {};
+                    Object.keys(dashStyle).forEach(key => {
+                        let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
+
+                        // content を label に変換
+                        if (kebabKey === 'content') kebabKey = 'label';
+
+                        finalStyle[kebabKey] = dashStyle[key];
+                    });
+
+                    // 【今回の最重要ポイント：セレクタ優先度の引き上げ】
+                    let cleanSelector = item.selector.trim();
+
+                    // 空白区切りをドットに置換 (例: ".edge tt25" -> ".edge.tt25")
+                    cleanSelector = cleanSelector.replace(/\s+/g, '.');
+
+                    // 本家Cytoscape.jsの内部デフォルトスタイルに打ち勝つため、
+                    // 全てのセレクタの先頭にノード/エッジ識別か、全要素ワイルドカード `*` を結合し、
+                    // さらに「後から読み込まれたスタイル」として優先度を最大化します。
+                    if (cleanSelector.includes('edge')) {
+                        cleanSelector = 'edge' + cleanSelector;
+                    } else if (cleanSelector.includes('node') || cleanSelector.includes('conn') || cleanSelector.includes('self')) {
+                        cleanSelector = 'node' + cleanSelector;
+                    } else {
+                        cleanSelector = '*' + cleanSelector;
+                    }
+
+                    return {
+                        selector: cleanSelector,
+                        style: finalStyle
+                    };
+                });
             }
 
-            // スタイルのパース・成形処理
-            let convertedStylesheet = rawStylesheet.map(item => {
-                let dashStyle = item.style || item.css || {};
-                if (typeof dashStyle === 'string') {
-                    try { dashStyle = JSON.parse(dashStyle); } catch (e) { }
-                }
-                const finalStyle = {};
-                Object.keys(dashStyle).forEach(key => {
-                    let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-                    if (kebabKey === 'content') kebabKey = 'label';
-                    finalStyle[kebabKey] = dashStyle[key];
-                });
-
-                let cleanSelector = item.selector.trim();
-                if (!cleanSelector.startsWith('.') && !cleanSelector.startsWith('#')) {
-                    cleanSelector = '.' + cleanSelector;
-                }
-                return {
-                    selector: cleanSelector.replace(/\s+/g, '.'),
-                    style: finalStyle
-                };
-            });
-
-            // 描画実行
+            // 3. グラフの描画を実行
             const cy = cytoscape({
                 container: document.getElementById('cy'),
                 elements: rawElements,
-                stylesheet: convertedStylesheet,
-                layout: { name: 'preset' },
+                stylesheet: convertedStylesheet, // 優先度を限界突破させたスタイル
+                layout: {
+                    name: 'preset'  // Python側の座標(position)をそのまま使用
+                },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
                 panningEnabled: true,
@@ -126,6 +99,8 @@
                 boxSelectionEnabled: false,
                 autounselectify: true
             });
+
+            // 4. 全体が綺麗に画面に収まるよう自動調整
             cy.fit(50);
         });
     </script>
