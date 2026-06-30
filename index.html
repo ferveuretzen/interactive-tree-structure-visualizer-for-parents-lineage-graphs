@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cytoscape Graph</title>
+    <!-- 対策1で保存したローカルファイルを読み込み -->
     <script src="cytoscape.min.js"></script>
     <style>
         body {
@@ -13,7 +14,7 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background-color: #fff;
+            background-color: #ffffff;
         }
 
         #cy {
@@ -34,40 +35,35 @@
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 1. エレメントの抽出とクラス名の完全配列化
+            // 1. エレメント（ノード・エッジ）の抽出
             let rawElements = configProps.elements || config.elements || [];
-            let convertedElements = rawElements.map(item => {
-                // オブジェクトのディープコピーを作成して元のデータを汚染しない
-                let el = JSON.parse(JSON.stringify(item));
-                if (el.classes && typeof el.classes === 'string') {
-                    // "edge term" を ["edge", "term"] のように完全な配列に変換
-                    el.classes = el.classes.trim().split(/\s+/);
-                } else if (!el.classes) {
-                    el.classes = [];
-                }
-                return el;
-            });
 
-            // 2. スタイルシートの抽出と、優先度・プロパティ名の完全補正
+            // 2. スタイルシートの抽出と、純粋なJavaScriptオブジェクトへの完全変換
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
             let convertedStylesheet = [];
 
             if (Array.isArray(rawStylesheet)) {
                 convertedStylesheet = rawStylesheet.map(item => {
-                    let rawStyle = item.style || item.css || {};
-                    if (typeof rawStyle === 'string') {
-                        try { rawStyle = JSON.parse(rawStyle); } catch (e) { rawStyle = {}; }
+                    // Python（Dash）が出力した内部のstyleオブジェクトを取得
+                    let dashStyle = item.style || item.css || {};
+
+                    // 万が一文字列だった場合のデコード処理
+                    if (typeof dashStyle === 'string') {
+                        try { dashStyle = JSON.parse(dashStyle); } catch (e) { dashStyle = {}; }
                     }
 
                     const finalStyle = {};
-                    Object.keys(rawStyle).forEach(key => {
+                    Object.keys(dashStyle).forEach(key => {
+                        // キャメルケースをケバブケースに変換 (curveStyle -> curve-style)
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
+
+                        // Dash特有の「content」を、本家JSが認識できる「label」に強制変換
                         if (kebabKey === 'content') kebabKey = 'label';
-                        finalStyle[kebabKey] = rawStyle[key];
+
+                        finalStyle[kebabKey] = dashStyle[key];
                     });
 
-                    // 本家JS版でスタイルが確実に「上書き（最優先）」されるよう、
-                    // セレクタの空白をドットに置換（例: ".edge tt25" -> "edge.tt25" または ".edge.tt25"）
+                    // 複数クラス（例: ".edge tt25"）をJS版が認識できるようにドット繋ぎに補正
                     let cleanSelector = item.selector.trim().replace(/\s+/g, '.');
 
                     return {
@@ -77,54 +73,13 @@
                 });
             }
 
-            // 3. 【追加】表示を確実にするためのデフォルトスタイル（ベース）を先頭に強制注入
-            // これにより、もしスタイルが当たらなくても最低限の文字やサイズが見えるようになります
-            const defaultBaseStyles = [
-                {
-                    selector: 'node',
-                    style: {
-                        'label': 'data(label)',
-                        'width': '40px',
-                        'height': '40px',
-                        'background-color': '#999',
-                        'text-valign': 'center',
-                        'text-halign': 'right',
-                        'color': '#000',
-                        'font-size': '14px'
-                    }
-                },
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': '2px',
-                        'line-color': '#ccc',
-                        'curve-style': 'taxi'
-                    }
-                },
-                {
-                    selector: '.parent', // 親ノード（境界ボックス）の見た目をクリアに
-                    style: {
-                        'background-opacity': '0.1',
-                        'background-color': '#aaa',
-                        'border-width': '1px',
-                        'border-color': '#ccc',
-                        'label': '' // 親ノード自体のラベルは非表示
-                    }
-                }
-            ];
-
-            // 補正したスタイルシートをデフォルトスタイルの後ろに結合（後勝ちで上書きさせる）
-            const finalStylesheet = defaultBaseStyles.concat(convertedStylesheet);
-
-            // 4. グラフの描画を実行
-            cytoscape({
+            // 3. グラフの描画を実行
+            const cy = cytoscape({
                 container: document.getElementById('cy'),
-                elements: convertedElements,
-                stylesheet: finalStylesheet,
+                elements: rawElements,
+                stylesheet: convertedStylesheet, // 完全に補正されたスタイル
                 layout: {
-                    name: 'preset',
-                    fit: true,       // 画面に収まるように自動ズーム調整
-                    padding: 50      // 画面端の余白
+                    name: 'preset'  // Python側の座標(position)をそのまま使用
                 },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
@@ -133,8 +88,8 @@
                 boxSelectionEnabled: false,
                 autounselectify: true
             });
+
+            // 4. 初期表示時に全体が綺麗に画面に収まるようズームを自動調整
+            cy.fit(50);
         });
     </script>
-</body>
-
-</html>
