@@ -35,37 +35,42 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // 1. Python側のデータから各設定を安全に抽出
             const configProps = cytoscapeConfig.props || {};
 
-            // 2. Dash特有の「stylesheet」の構造をJS（Cytoscape.js）の形式に変換
+            // Dash Cytoscape のスタイルシートを JS（Cytoscape.js）形式に徹底変換
             let convertedStylesheet = [];
             if (Array.isArray(configProps.stylesheet)) {
-                convertedStylesheet = configProps.stylesheet.map(style => {
-                    // Python側の「style」はJS側では「css」または「style」として処理する
+                convertedStylesheet = configProps.stylesheet.map(item => {
+                    // Python側の style または css の中身を取得
+                    const rawStyle = item.style || item.css || {};
+                    const finalStyle = {};
+
+                    // キー名のズレ（キャメルケースからケバブケースへの変換など）を補正
+                    Object.keys(rawStyle).forEach(key => {
+                        // JavaScriptのキャメルケース（curveStyle）をCSSのケバブケース（curve-style）に変換
+                        let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
+
+                        // 特殊なキーの変換（content -> label など、DashとJSの差異を吸収）
+                        if (kebabKey === 'content') kebabKey = 'label';
+
+                        finalStyle[kebabKey] = rawStyle[key];
+                    });
+
                     return {
-                        selector: style.selector,
-                        style: style.style || style.css || {}
+                        selector: item.selector,
+                        style: finalStyle
                     };
                 });
             }
 
-            // 3. グラフの描画を実行
+            // グラフの描画を実行
             cytoscape({
                 container: document.getElementById('cy'),
-
-                // エレメントデータをそのまま流し込む
                 elements: configProps.elements || [],
-
-                // 変換後のスタイルシートを適用（これでラベルやエッジの形状が復活します）
-                stylesheet: convertedStylesheet,
-
-                // 自動配置を防ぎ、Python側で指定した位置(position)を100%再現する
+                stylesheet: convertedStylesheet, // 変換後の強力なスタイルシートを適用
                 layout: {
                     name: 'preset'
                 },
-
-                // 操作・インタラクションの設定
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
                 panningEnabled: true,
