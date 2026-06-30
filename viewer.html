@@ -61,7 +61,7 @@
             document.title = `${graphName} - 家系図表示`;
 
             const script = document.createElement('script');
-            script.src = `${graphName}_graph_config.js`;
+            script.src = `graph_config_${graphName}.js`;
 
             script.onload = function () {
                 if (typeof cytoscapeConfig === 'undefined') {
