@@ -32,39 +32,67 @@
 
     <script>
         window.addEventListener('load', () => {
-
-            if (typeof cytoscape === 'undefined') {
-                console.error("Cytoscapeライブラリの読み込みに失敗しました。");
-                return;
-            }
+            if (typeof cytoscape === 'undefined') return;
 
             if (typeof cytoscapeConfig !== 'undefined') {
-                // 1. 基本設定を合体
-                const config = Object.assign({}, cytoscapeConfig, {
-                    container: document.getElementById('cy')
-                });
+                console.log("元の設定データ:", cytoscapeConfig);
 
-                // 2. グラフを描画して、インスタンス（cy）を受け取る
-                const cy = cytoscape(config);
-                console.log("グラフを描画しました");
+                // 💡 Dashのダンプデータから、純粋なノードと線のデータを救出する
+                // データの階層（propsの中など）に合わせて自動で探索します
+                const rawElements = cytoscapeConfig.elements ||
+                    (cytoscapeConfig.props && cytoscapeConfig.props.elements) ||
+                    cytoscapeConfig.data || [];
 
-                // ✨ 【解決策1】グラフ全体を強制的に画面にフィットさせる
+                // 🎨 JavaScript側で、見た目（スタイル）を強制的に再定義する
+                // （点の色を青、文字を黒、線をグレーに設定）
+                const defaultStylesheet = [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#0074D9',
+                            'label': 'data(label)', // ノードに文字を表示
+                            'color': '#000000',
+                            'width': '30px',
+                            'height': '30px',
+                            'font-size': '12px',
+                            'text-valign': 'center',
+                            'text-halign': 'panel'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#999',
+                            'target-arrow-color': '#999',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier'
+                        }
+                    }
+                ];
+
+                // 🏗️ Cytoscapeが動く形にデータを組み立て直す
+                const cleanConfig = {
+                    container: document.getElementById('cy'),
+                    elements: rawElements,
+                    style: defaultStylesheet, // 壊れたスタイルの代わりに上記を適用
+                    layout: {
+                        name: 'cose', // 自動で綺麗に分散配置するレイアウト
+                        animate: false
+                    }
+                };
+
+                // グラフを描画
+                const cy = cytoscape(cleanConfig);
                 cy.fit();
 
-                // ✨ 【解決策2】もし座標がなくて消えている場合、強制的にグリッド配置にする
-                // (もし自前のレイアウトを維持したい場合は、下の5行を消してください)
-                cy.layout({
-                    name: 'grid', // 'cose'（自動分散）や 'circle'（円状）に変えてもOKです
-                    animate: false
-                }).run();
+                console.log("クリーンアップ後の描画を実行しました。要素数:", cy.elements().length);
 
-                // 画面サイズが変わったときも自動でフィットさせる
-                window.addEventListener('resize', () => {
-                    cy.fit();
-                });
+                if (cy.elements().length === 0) {
+                    console.error("エラー: ノードや線のデータ（elements）が見つかりませんでした。データ構造の確認が必要です。");
+                }
 
-            } else {
-                console.error("変数 cytoscapeConfig が見つかりません。");
+                window.addEventListener('resize', () => { cy.fit(); });
             }
         });
     </script>
