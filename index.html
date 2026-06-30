@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cytoscape Graph</title>
+    <title>Cytoscape Debug</title>
     <script src="cytoscape.min.js"></script>
     <style>
         body {
@@ -13,7 +13,7 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background-color: #fff;
+            font-family: sans-serif;
         }
 
         #cy {
@@ -21,73 +21,104 @@
             height: 100%;
             display: block;
         }
+
+        /* 画面上部に診断結果を表示するパネル */
+        #debug-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            max-width: 90vw;
+            overflow-x: auto;
+        }
+
+        .error {
+            color: #ff3333;
+            font-weight: bold;
+        }
     </style>
 </head>
 
 <body>
+
+    <div id="debug-panel">
+        <div>🔍 【データ読み込み診断状況】</div>
+        <div id="check-config">・graph_config.js の読み込み: 判定中...</div>
+        <div id="check-elements">・検出された要素（ノード・エッジ）数: 判定中...</div>
+        <div id="check-styles">・検出されたスタイル数: 判定中...</div>
+        <div id="check-raw-selector">・データ内の最初のセレクタ名: 判定中...</div>
+    </div>
 
     <div id="cy"></div>
     <script src="graph_config.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const logConfig = document.getElementById('check-config');
+            const logElements = document.getElementById('check-elements');
+            const logStyles = document.getElementById('check-styles');
+            const logSelector = document.getElementById('check-raw-selector');
+
+            // 1. そもそもファイルが読み込めているかチェック
+            if (typeof cytoscapeConfig === 'undefined') {
+                logConfig.innerHTML = '❌ graph_config.js が読み込めていません（変数未定義）';
+                logConfig.className = 'error';
+                return;
+            }
+            logConfig.innerHTML = '✅ graph_config.js の読み込み成功！';
+
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 1. エレメント（ノード・エッジ）の抽出
+            // 2. 要素数のチェック
             let rawElements = configProps.elements || config.elements || [];
+            logElements.innerHTML = `✅ 要素数: ${rawElements.length} 個（ノードとエッジの合計）`;
 
-            // 2. スタイルシートの抽出と、JavaScript（本家）向けへの完全適合化
+            // 3. スタイルシートのチェック
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
-            let convertedStylesheet = [];
+            logStyles.innerHTML = `✅ スタイル数: ${rawStylesheet.length} 個`;
 
-            if (Array.isArray(rawStylesheet)) {
-                convertedStylesheet = rawStylesheet.map(item => {
-                    let dashStyle = item.style || item.css || {};
-
-                    // 文字列（JSON）だった場合のデコード処理
-                    if (typeof dashStyle === 'string') {
-                        try { dashStyle = JSON.parse(dashStyle); } catch (e) { dashStyle = {}; }
-                    }
-
-                    const finalStyle = {};
-                    Object.keys(dashStyle).forEach(key => {
-                        let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-
-                        // Dash特有の「content」を、本家JSが認識できる「label」に変換
-                        if (kebabKey === 'content') kebabKey = 'label';
-
-                        finalStyle[kebabKey] = dashStyle[key];
-                    });
-
-                    // 【最重要】セレクタの形式（ドットの有無）を補正
-                    let cleanSelector = item.selector.trim();
-
-                    // データ側（classes:"node"など）に合わせるため、
-                    // もしセレクタが "node" や "edge" から始まっていてドットが無い場合、
-                    // 先頭にドットを付与してクラスセレクタ (.node や .edge) に変換します
-                    if (!cleanSelector.startsWith('.') && !cleanSelector.startsWith('#')) {
-                        cleanSelector = '.' + cleanSelector;
-                    }
-
-                    // 複数クラス（例: ".edge tt25"）をJS版が認識できるようにドット繋ぎに補正
-                    cleanSelector = cleanSelector.replace(/\s+/g, '.');
-
-                    return {
-                        selector: cleanSelector,
-                        style: finalStyle
-                    };
-                });
+            if (rawStylesheet.length > 0) {
+                logSelector.innerHTML = `✅ 最初のセレクタ: "${rawStylesheet[0].selector}"`;
+            } else {
+                logSelector.innerHTML = '❌ スタイルが0個、または格納場所が違います';
+                logSelector.className = 'error';
             }
 
-            // 3. グラフの描画を実行
+            // スタイルのパース・成形処理
+            let convertedStylesheet = rawStylesheet.map(item => {
+                let dashStyle = item.style || item.css || {};
+                if (typeof dashStyle === 'string') {
+                    try { dashStyle = JSON.parse(dashStyle); } catch (e) { }
+                }
+                const finalStyle = {};
+                Object.keys(dashStyle).forEach(key => {
+                    let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
+                    if (kebabKey === 'content') kebabKey = 'label';
+                    finalStyle[kebabKey] = dashStyle[key];
+                });
+
+                let cleanSelector = item.selector.trim();
+                if (!cleanSelector.startsWith('.') && !cleanSelector.startsWith('#')) {
+                    cleanSelector = '.' + cleanSelector;
+                }
+                return {
+                    selector: cleanSelector.replace(/\s+/g, '.'),
+                    style: finalStyle
+                };
+            });
+
+            // 描画実行
             const cy = cytoscape({
                 container: document.getElementById('cy'),
                 elements: rawElements,
-                stylesheet: convertedStylesheet, // クラスマッチを強制したスタイルシート
-                layout: {
-                    name: 'preset'  // 位置座標を完全固定
-                },
+                stylesheet: convertedStylesheet,
+                layout: { name: 'preset' },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
                 panningEnabled: true,
@@ -95,13 +126,9 @@
                 boxSelectionEnabled: false,
                 autounselectify: true
             });
-
-            // 4. 初期表示時に全体が綺麗に画面に収まるようズームを自動調整
             cy.fit(50);
         });
     </script>
-
-
 </body>
 
 </html>
