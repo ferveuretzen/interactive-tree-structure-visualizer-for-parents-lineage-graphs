@@ -5,16 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cytoscape Graph</title>
-    <!-- Cytoscape.js の読み込み -->
     <script src="cytoscape.min.js"></script>
     <style>
-        /* 画面全体にグラフを表示する設定 */
         body {
             margin: 0;
             padding: 0;
             width: 100vw;
             height: 100vh;
             overflow: hidden;
+            background-color: #fff;
         }
 
         #cy {
@@ -27,10 +26,7 @@
 
 <body>
 
-    <!-- グラフが描画されるコンテナ -->
     <div id="cy"></div>
-
-    <!-- Pythonから出力した設定ファイルの読み込み -->
     <script src="graph_config.js"></script>
 
     <script>
@@ -38,34 +34,41 @@
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 1. エレメントデータの抽出
+            // 1. エレメントの抽出とクラス名の完全配列化
             let rawElements = configProps.elements || config.elements || [];
+            let convertedElements = rawElements.map(item => {
+                // オブジェクトのディープコピーを作成して元のデータを汚染しない
+                let el = JSON.parse(JSON.stringify(item));
+                if (el.classes && typeof el.classes === 'string') {
+                    // "edge term" を ["edge", "term"] のように完全な配列に変換
+                    el.classes = el.classes.trim().split(/\s+/);
+                } else if (!el.classes) {
+                    el.classes = [];
+                }
+                return el;
+            });
 
-            // 2. スタイルシートの抽出と、JavaScript（本家）向けへの最適化
+            // 2. スタイルシートの抽出と、優先度・プロパティ名の完全補正
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
             let convertedStylesheet = [];
 
             if (Array.isArray(rawStylesheet)) {
                 convertedStylesheet = rawStylesheet.map(item => {
                     let rawStyle = item.style || item.css || {};
-                    const finalStyle = {};
+                    if (typeof rawStyle === 'string') {
+                        try { rawStyle = JSON.parse(rawStyle); } catch (e) { rawStyle = {}; }
+                    }
 
+                    const finalStyle = {};
                     Object.keys(rawStyle).forEach(key => {
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-
-                        // Dashの content を JSの label に変換
                         if (kebabKey === 'content') kebabKey = 'label';
-
                         finalStyle[kebabKey] = rawStyle[key];
                     });
 
-                    // 【最重要】"edge tt25" のような複数クラス指定（.edge.tt25）でも、
-                    // JavaScript側が確実に認識できるようにセレクタのスペースをドットに置換します
-                    let cleanSelector = item.selector;
-                    if (cleanSelector.startsWith('.')) {
-                        // 空白区切りをドット区切りに変換（例: ".edge tt25" -> ".edge.tt25"）
-                        cleanSelector = cleanSelector.trim().replace(/\s+/g, '.');
-                    }
+                    // 本家JS版でスタイルが確実に「上書き（最優先）」されるよう、
+                    // セレクタの空白をドットに置換（例: ".edge tt25" -> "edge.tt25" または ".edge.tt25"）
+                    let cleanSelector = item.selector.trim().replace(/\s+/g, '.');
 
                     return {
                         selector: cleanSelector,
@@ -74,13 +77,54 @@
                 });
             }
 
-            // 3. グラフの描画を実行
+            // 3. 【追加】表示を確実にするためのデフォルトスタイル（ベース）を先頭に強制注入
+            // これにより、もしスタイルが当たらなくても最低限の文字やサイズが見えるようになります
+            const defaultBaseStyles = [
+                {
+                    selector: 'node',
+                    style: {
+                        'label': 'data(label)',
+                        'width': '40px',
+                        'height': '40px',
+                        'background-color': '#999',
+                        'text-valign': 'center',
+                        'text-halign': 'right',
+                        'color': '#000',
+                        'font-size': '14px'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': '2px',
+                        'line-color': '#ccc',
+                        'curve-style': 'taxi'
+                    }
+                },
+                {
+                    selector: '.parent', // 親ノード（境界ボックス）の見た目をクリアに
+                    style: {
+                        'background-opacity': '0.1',
+                        'background-color': '#aaa',
+                        'border-width': '1px',
+                        'border-color': '#ccc',
+                        'label': '' // 親ノード自体のラベルは非表示
+                    }
+                }
+            ];
+
+            // 補正したスタイルシートをデフォルトスタイルの後ろに結合（後勝ちで上書きさせる）
+            const finalStylesheet = defaultBaseStyles.concat(convertedStylesheet);
+
+            // 4. グラフの描画を実行
             cytoscape({
                 container: document.getElementById('cy'),
-                elements: rawElements,              // データをそのまま流し込む
-                stylesheet: convertedStylesheet,   // セレクタを最適化したスタイル
+                elements: convertedElements,
+                stylesheet: finalStylesheet,
                 layout: {
-                    name: 'preset'                 // 位置座標を完全固定
+                    name: 'preset',
+                    fit: true,       // 画面に収まるように自動ズーム調整
+                    padding: 50      // 画面端の余白
                 },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
