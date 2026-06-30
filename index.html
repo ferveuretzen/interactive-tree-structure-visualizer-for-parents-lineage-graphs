@@ -4,74 +4,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cytoscape 完全再現グラフィック</title>
+    <title>Cytoscape Graph</title>
+    <!-- Cytoscape.js の読み込み -->
+    <script src="https://cloudflare.com"></script>
     <style>
-        html,
-        body,
+        /* 画面全体にグラフを表示する設定 */
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
         #cy {
             width: 100%;
             height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #fcfcfc;
+            display: block;
         }
     </style>
 </head>
 
 <body>
 
+    <!-- グラフが描画されるコンテナ -->
     <div id="cy"></div>
 
-    <!-- ライブラリと、新しくなった純粋な設定ファイルの読み込み -->
-    <script src="cytoscape.min.js"></script>
+    <!-- Pythonから出力した設定ファイルの読み込み -->
     <script src="graph_config.js"></script>
 
     <script>
-        window.addEventListener('load', () => {
-            if (typeof cytoscape === 'undefined' || typeof cytoscapeConfig === 'undefined') {
-                console.error("ライブラリ、またはデータが読み込めません。");
-                return;
-            }
+        // グラフの初期化と描画
+        document.addEventListener('DOMContentLoaded', function () {
+            cytoscape({
+                container: document.getElementById('cy'),
 
-            console.log("純粋なCytoscape設定データを読み込みました:", cytoscapeConfig);
+                // Python側で指定したデータをそのまま流し込む
+                elements: cytoscapeConfig.props.elements,
+                stylesheet: cytoscapeConfig.props.stylesheet,
+                layout: cytoscapeConfig.props.layout,
 
-            // 🏗️ Python側から出力された設定をベースに、表示するコンテナ（枠）だけを指定
-            const cleanConfig = Object.assign({}, cytoscapeConfig, {
-                container: document.getElementById('cy')
-            });
-
-            // 💡 警告対策：もしPythonのスタイル指定が「Dash用（CSS）」になっていた場合、
-            // Cytoscape本体がエラーを起こすのを防ぐため、もし stylesheet が存在しなければ補完する
-            if (!cleanConfig.stylesheet && cleanConfig.style && Array.isArray(cleanConfig.style)) {
-                cleanConfig.stylesheet = cleanConfig.style;
-                delete cleanConfig.style;
-            }
-
-            // 🗺️ レイアウトの固定設定
-            // 元々座標（position）が決まっている家系図なので、強制的に 'preset'（位置固定）で描画します
-            cleanConfig.layout = {
-                name: 'preset'
-            };
-
-            // 🎨 グラフを描画
-            const cy = cytoscape(cleanConfig);
-
-            // 描画後、元々の配置スケールに合わせて画面中央にピタッとフィットさせる
-            setTimeout(() => {
-                cy.fit();
-                cy.center();
-            }, 100);
-
-            console.log("元々の設定を忠実に再現して描画しました。要素数:", cy.elements().length);
-
-            window.addEventListener('resize', () => {
-                cy.resize();
-                cy.fit();
+                // 操作・インタラクションの設定
+                zoomingEnabled: true,      // 拡大縮小を許可
+                userZoomingEnabled: true,  // ユーザーのズーム操作を許可
+                panningEnabled: true,      // 画面の移動を許可
+                userPanningEnabled: true,  // ユーザーの画面移動を許可
+                boxSelectionEnabled: false,// 複数選択は不要
+                autounselectify: true      // ノードの選択状態の変化を無効化
             });
         });
     </script>
-
 </body>
 
 </html>
