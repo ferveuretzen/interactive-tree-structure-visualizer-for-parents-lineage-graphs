@@ -31,26 +31,37 @@
     <script src="graph_config.js"></script>
 
     <script>
-        // ページと全てのスクリプト（Cytoscape本体とデータ）の読み込みが完全に終わったら実行
         window.addEventListener('load', () => {
 
-            // 1. まずCytoscapeが正しく読み込まれているかチェック
             if (typeof cytoscape === 'undefined') {
-                console.error("Cytoscapeライブラリの読み込みに失敗しました。ネット接続やURLを確認してください。");
+                console.error("Cytoscapeライブラリの読み込みに失敗しました。");
                 return;
             }
 
-            // 2. 次にデータ（変数）があるかチェック
             if (typeof cytoscapeConfig !== 'undefined') {
-
-                // 元の設定に、表示する枠（container）の情報を合体させる
+                // 1. 基本設定を合体
                 const config = Object.assign({}, cytoscapeConfig, {
                     container: document.getElementById('cy')
                 });
 
-                // グラフを描画
-                cytoscape(config);
+                // 2. グラフを描画して、インスタンス（cy）を受け取る
+                const cy = cytoscape(config);
                 console.log("グラフを描画しました");
+
+                // ✨ 【解決策1】グラフ全体を強制的に画面にフィットさせる
+                cy.fit();
+
+                // ✨ 【解決策2】もし座標がなくて消えている場合、強制的にグリッド配置にする
+                // (もし自前のレイアウトを維持したい場合は、下の5行を消してください)
+                cy.layout({
+                    name: 'grid', // 'cose'（自動分散）や 'circle'（円状）に変えてもOKです
+                    animate: false
+                }).run();
+
+                // 画面サイズが変わったときも自動でフィットさせる
+                window.addEventListener('resize', () => {
+                    cy.fit();
+                });
 
             } else {
                 console.error("変数 cytoscapeConfig が見つかりません。");
