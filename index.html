@@ -3,23 +3,28 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plotly グラフ表示</title>
-    <!-- Plotly.js（グラフ描画ライブラリ）を読み込む -->
+    <!-- 1. まずPlotlyのライブラリを確実に読み込む -->
     <script src="https://plot.ly" charset="utf-8"></script>
 </head>
 
 <body>
 
-    <!-- グラフを表示するための枠（コンテナ） -->
     <div id="my-graph" style="width:100%; height:100vh;"></div>
 
-    <!-- 設定ファイルを読み込む -->
+    <!-- 2. 次にデータを読み込む -->
     <script src="graph_config.js"></script>
 
     <script>
-        // graph_config.js 内で定義されている変数（例: data, layout）を使ってグラフを描画
-        // ※変数名は graph_config.js の記述に合わせて「graphData」などに適宜変更してください
-        Plotly.newPlot('my-graph', data, layout);
+        // 画面の準備と、データの読み込みが両方終わってから描画する
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof data !== 'undefined' && typeof layout !== 'undefined') {
+                Plotly.newPlot('my-graph', data, layout);
+            } else {
+                console.log("変数名が data / layout ではない可能性があります");
+            }
+        });
     </script>
 
 </body>
