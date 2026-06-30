@@ -5,42 +5,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cytoscape グラフ表示</title>
-    <!-- 1. Plotlyではなく、Cytoscape.js（本体ライブラリ）を読み込む -->
-    <script src="https://cloudflare.com"></script>
     <style>
-        /* グラフを画面いっぱいに表示するためのスタイル設定 */
+        /* 画面いっぱいにグラフを表示する設定 */
+        html,
+        body,
         #cy {
             width: 100%;
-            height: 100vh;
-            display: block;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- グラフを表示する枠（コンテナ） -->
+    <!-- グラフを表示する枠 -->
     <div id="cy"></div>
 
-    <!-- 2. 設定ファイル（cytoscapeConfigが入っているファイル）を読み込む -->
+    <!-- 1. Cytoscape.js の本体ライブラリを確実に読み込む（公式CDNに変更） -->
+    <script src="https://unpkg.com"></script>
+
+    <!-- 2. あなたの設定ファイルを読み込む -->
     <script src="graph_config.js"></script>
 
     <script>
-        // 画面とデータの読み込みが完了したら実行
-        window.addEventListener('DOMContentLoaded', () => {
+        // ページと全てのスクリプト（Cytoscape本体とデータ）の読み込みが完全に終わったら実行
+        window.addEventListener('load', () => {
+
+            // 1. まずCytoscapeが正しく読み込まれているかチェック
+            if (typeof cytoscape === 'undefined') {
+                console.error("Cytoscapeライブラリの読み込みに失敗しました。ネット接続やURLを確認してください。");
+                return;
+            }
+
+            // 2. 次にデータ（変数）があるかチェック
             if (typeof cytoscapeConfig !== 'undefined') {
 
-                // cytoscapeConfigの中にすでに「container」の設定が含まれているか確認
-                // 含まれていなければ、この画面の #cy 枠を指定する
+                // 元の設定に、表示する枠（container）の情報を合体させる
                 const config = Object.assign({}, cytoscapeConfig, {
                     container: document.getElementById('cy')
                 });
 
-                // Cytoscapeグラフを描画
+                // グラフを描画
                 cytoscape(config);
+                console.log("グラフを描画しました");
 
             } else {
-                console.error("変数 cytoscapeConfig が見つかりません。ファイル名や記述を確認してください。");
+                console.error("変数 cytoscapeConfig が見つかりません。");
             }
         });
     </script>
