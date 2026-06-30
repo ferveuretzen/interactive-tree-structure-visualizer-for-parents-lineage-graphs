@@ -38,42 +38,37 @@
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 1. エレメント（ノード・エッジ）のクラス名（スペース区切り）をJSが認識できる配列に変換
+            // 1. エレメントデータの抽出
             let rawElements = configProps.elements || config.elements || [];
-            let convertedElements = rawElements.map(item => {
-                if (item.classes && typeof item.classes === 'string') {
-                    // "edge tt25" を ["edge", "tt25"] のように配列に分解
-                    item.classes = item.classes.trim().split(/\s+/);
-                }
-                return item;
-            });
 
-            // 2. スタイルシートの抽出（propsの中、または直下の両方に対応）
+            // 2. スタイルシートの抽出と、JavaScript（本家）向けへの最適化
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
             let convertedStylesheet = [];
 
             if (Array.isArray(rawStylesheet)) {
                 convertedStylesheet = rawStylesheet.map(item => {
                     let rawStyle = item.style || item.css || {};
-
-                    // 文字列（JSON）になっていた場合はオブジェクトにパース
-                    if (typeof rawStyle === 'string') {
-                        try { rawStyle = JSON.parse(rawStyle); } catch (e) { rawStyle = {}; }
-                    }
-
                     const finalStyle = {};
+
                     Object.keys(rawStyle).forEach(key => {
-                        // キャメルケースをケバブケースに変換 (curveStyle -> curve-style)
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
 
-                        // Dashの content を JSの label に変換（文字化けのないようそのまま渡す）
+                        // Dashの content を JSの label に変換
                         if (kebabKey === 'content') kebabKey = 'label';
 
                         finalStyle[kebabKey] = rawStyle[key];
                     });
 
+                    // 【最重要】"edge tt25" のような複数クラス指定（.edge.tt25）でも、
+                    // JavaScript側が確実に認識できるようにセレクタのスペースをドットに置換します
+                    let cleanSelector = item.selector;
+                    if (cleanSelector.startsWith('.')) {
+                        // 空白区切りをドット区切りに変換（例: ".edge tt25" -> ".edge.tt25"）
+                        cleanSelector = cleanSelector.trim().replace(/\s+/g, '.');
+                    }
+
                     return {
-                        selector: item.selector,
+                        selector: cleanSelector,
                         style: finalStyle
                     };
                 });
@@ -82,10 +77,10 @@
             // 3. グラフの描画を実行
             cytoscape({
                 container: document.getElementById('cy'),
-                elements: convertedElements,       // クラス名を最適化したエレメント
-                stylesheet: convertedStylesheet,   // パース完了したスタイル
+                elements: rawElements,              // データをそのまま流し込む
+                stylesheet: convertedStylesheet,   // セレクタを最適化したスタイル
                 layout: {
-                    name: 'preset'                 // Python側の座標(position)を完全固定
+                    name: 'preset'                 // 位置座標を完全固定
                 },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
