@@ -41,16 +41,26 @@
             let convertedStylesheet = [];
             if (Array.isArray(configProps.stylesheet)) {
                 convertedStylesheet = configProps.stylesheet.map(item => {
-                    // Python側の style または css の中身を取得
-                    const rawStyle = item.style || item.css || {};
+                    let rawStyle = item.style || item.css || {};
+
+                    // 【重要】もし style が文字列（JSON文字列）になっていたらオブジェクトに変換する
+                    if (typeof rawStyle === 'string') {
+                        try {
+                            rawStyle = JSON.parse(rawStyle);
+                        } catch (e) {
+                            console.error("Stylesのパースに失敗しました:", e);
+                            rawStyle = {};
+                        }
+                    }
+
                     const finalStyle = {};
 
-                    // キー名のズレ（キャメルケースからケバブケースへの変換など）を補正
+                    // キー名と値の補正
                     Object.keys(rawStyle).forEach(key => {
-                        // JavaScriptのキャメルケース（curveStyle）をCSSのケバブケース（curve-style）に変換
+                        // キャメルケース（curveStyle）をケバブケース（curve-style）に変換
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
 
-                        // 特殊なキーの変換（content -> label など、DashとJSの差異を吸収）
+                        // Dashの「content」をJSの「label」に変換
                         if (kebabKey === 'content') kebabKey = 'label';
 
                         finalStyle[kebabKey] = rawStyle[key];
@@ -67,7 +77,7 @@
             cytoscape({
                 container: document.getElementById('cy'),
                 elements: configProps.elements || [],
-                stylesheet: convertedStylesheet, // 変換後の強力なスタイルシートを適用
+                stylesheet: convertedStylesheet, // デコード済みのスタイルシートを適用
                 layout: {
                     name: 'preset'
                 },
