@@ -34,23 +34,44 @@
     <script src="graph_config.js"></script>
 
     <script>
-        // グラフの初期化と描画
         document.addEventListener('DOMContentLoaded', function () {
+            // 1. Python側のデータから各設定を安全に抽出
+            const configProps = cytoscapeConfig.props || {};
+
+            // 2. Dash特有の「stylesheet」の構造をJS（Cytoscape.js）の形式に変換
+            let convertedStylesheet = [];
+            if (Array.isArray(configProps.stylesheet)) {
+                convertedStylesheet = configProps.stylesheet.map(style => {
+                    // Python側の「style」はJS側では「css」または「style」として処理する
+                    return {
+                        selector: style.selector,
+                        style: style.style || style.css || {}
+                    };
+                });
+            }
+
+            // 3. グラフの描画を実行
             cytoscape({
                 container: document.getElementById('cy'),
 
-                // Python側で指定したデータをそのまま流し込む
-                elements: cytoscapeConfig.props.elements,
-                stylesheet: cytoscapeConfig.props.stylesheet,
-                layout: cytoscapeConfig.props.layout,
+                // エレメントデータをそのまま流し込む
+                elements: configProps.elements || [],
+
+                // 変換後のスタイルシートを適用（これでラベルやエッジの形状が復活します）
+                stylesheet: convertedStylesheet,
+
+                // 自動配置を防ぎ、Python側で指定した位置(position)を100%再現する
+                layout: {
+                    name: 'preset'
+                },
 
                 // 操作・インタラクションの設定
-                zoomingEnabled: true,      // 拡大縮小を許可
-                userZoomingEnabled: true,  // ユーザーのズーム操作を許可
-                panningEnabled: true,      // 画面の移動を許可
-                userPanningEnabled: true,  // ユーザーの画面移動を許可
-                boxSelectionEnabled: false,// 複数選択は不要
-                autounselectify: true      // ノードの選択状態の変化を無効化
+                zoomingEnabled: true,
+                userZoomingEnabled: true,
+                panningEnabled: true,
+                userPanningEnabled: true,
+                boxSelectionEnabled: false,
+                autounselectify: true
             });
         });
     </script>
