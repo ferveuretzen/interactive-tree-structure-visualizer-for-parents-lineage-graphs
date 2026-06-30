@@ -4,25 +4,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plotly グラフ表示</title>
-    <!-- 1. まずPlotlyのライブラリを確実に読み込む -->
-    <script src="https://plot.ly" charset="utf-8"></script>
+    <title>Cytoscape グラフ表示</title>
+    <!-- 1. Plotlyではなく、Cytoscape.js（本体ライブラリ）を読み込む -->
+    <script src="https://cloudflare.com"></script>
+    <style>
+        /* グラフを画面いっぱいに表示するためのスタイル設定 */
+        #cy {
+            width: 100%;
+            height: 100vh;
+            display: block;
+        }
+    </style>
 </head>
 
 <body>
 
-    <div id="my-graph" style="width:100%; height:100vh;"></div>
+    <!-- グラフを表示する枠（コンテナ） -->
+    <div id="cy"></div>
 
-    <!-- 2. 次にデータを読み込む -->
+    <!-- 2. 設定ファイル（cytoscapeConfigが入っているファイル）を読み込む -->
     <script src="graph_config.js"></script>
 
     <script>
-        // 画面の準備と、データの読み込みが両方終わってから描画する
+        // 画面とデータの読み込みが完了したら実行
         window.addEventListener('DOMContentLoaded', () => {
-            if (typeof data !== 'undefined' && typeof layout !== 'undefined') {
-                Plotly.newPlot('my-graph', data, layout);
+            if (typeof cytoscapeConfig !== 'undefined') {
+
+                // cytoscapeConfigの中にすでに「container」の設定が含まれているか確認
+                // 含まれていなければ、この画面の #cy 枠を指定する
+                const config = Object.assign({}, cytoscapeConfig, {
+                    container: document.getElementById('cy')
+                });
+
+                // Cytoscapeグラフを描画
+                cytoscape(config);
+
             } else {
-                console.log("変数名が data / layout ではない可能性があります");
+                console.error("変数 cytoscapeConfig が見つかりません。ファイル名や記述を確認してください。");
             }
         });
     </script>
