@@ -4,9 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cytoscape グラフ表示</title>
+    <title>Cytoscape 家系図表示</title>
     <style>
-        /* 画面いっぱいにグラフを表示する設定 */
         html,
         body,
         #cy {
@@ -15,19 +14,18 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            background-color: #fcfcfc;
+            /* 画面を見やすく */
         }
     </style>
 </head>
 
 <body>
 
-    <!-- グラフを表示する枠 -->
     <div id="cy"></div>
 
-    <!-- 1. Cytoscape.js の本体ライブラリを確実に読み込む（公式CDNに変更） -->
-    <script src="cytoscape.min.js"></script>
-
-    <!-- 2. あなたの設定ファイルを読み込む -->
+    <!-- ライブラリの読み込み -->
+    <script src="https://cloudflare.com" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="graph_config.js"></script>
 
     <script>
@@ -37,69 +35,106 @@
             if (typeof cytoscapeConfig !== 'undefined') {
                 console.log("元の設定データ:", cytoscapeConfig);
 
-                // 💡 配列（Array）の1番目、またはデータの中から elements を確実に救出する
+                // 💡 【修正点1】ネストされたDashのデータ構造から、ノード/線の純粋な配列をディープに探す
                 let rawElements = [];
 
-                if (Array.isArray(cytoscapeConfig)) {
-                    // 配列の場合：1番目の要素（cytoscapeConfig[0]）にelementsが入っているケースがほとんどです
-                    rawElements = cytoscapeConfig[0].elements || cytoscapeConfig[0] || [];
-                } else {
-                    // オブジェクトの場合
-                    rawElements = cytoscapeConfig.elements || (cytoscapeConfig.props && cytoscapeConfig.props.elements) || [];
+                function findElements(obj) {
+                    if (!obj) return;
+                    if (obj.elements && Array.isArray(obj.elements)) {
+                        rawElements = obj.elements;
+                        return;
+                    }
+                    if (Array.isArray(obj)) {
+                        for (let item of obj) {
+                            if (item && item.elements) {
+                                rawElements = item.elements;
+                                return;
+                            }
+                            // 配列そのものがノードのリスト（props.elementsの中身など）である場合
+                            if (item && item.data) {
+                                rawElements = obj;
+                                return;
+                            }
+                            findElements(item);
+                        }
+                    } else if (typeof obj === 'object') {
+                        if (obj.props) findElements(obj.props);
+                        else {
+                            for (let key in obj) {
+                                if (typeof obj[key] === 'object') findElements(obj[key]);
+                            }
+                        }
+                    }
                 }
 
-                // もし救出したデータがまだオブジェクトの中に隠れていたら、さらに一段剥く
-                if (rawElements.elements) {
-                    rawElements = rawElements.elements;
-                }
+                findElements(cytoscapeConfig);
 
-                // 🎨 JavaScript側で見た目（スタイル）を綺麗に定義し直す
+                // 🎨 【修正点2】エラーが出ない安全なスタイル（ラベルが無くても落ちないように制限）
                 const defaultStylesheet = [
                     {
                         selector: 'node',
                         style: {
                             'background-color': '#0074D9',
-                            'label': 'data(label)', // 家系図の名前（ラベル）を表示
-                            'color': '#000000',
-                            'width': '40px',
-                            'height': '40px',
-                            'font-size': '12px',
+                            'color': '#333333',
+                            'width': '35px',
+                            'height': '35px',
+                            'font-size': '11px',
                             'text-valign': 'center',
-                            'text-halign': 'center', // ⚠️ panel から center に修正してエラーを解消
+                            'text-halign': 'center',
                             'background-opacity': 0.8,
-                            'border-width': 2,
+                            'border-width': 1.5,
                             'border-color': '#0056b3'
                         }
+                    },
+                    {
+                        // labelデータを持っているノードだけに、安全に文字を表示させる（エラー回避）
+                        selector: 'node[label]',
+                        style: {
+                            'label': 'data(label)'
+                        }
+                    },
+                    {
+                        // もしlabelが無くてidやnameがあった場合、そちらを表示させる予備設定
+                        selector: 'node[!label][name]',
+                        style: { 'label': 'data(name)' }
+                    },
+                    {
+                        selector: 'node[!label][!name]',
+                        style: { 'label': 'data(id)' }
                     },
                     {
                         selector: 'edge',
                         style: {
                             'width': 2,
-                            'line-color': '#999',
-                            'target-arrow-color': '#999',
-                            'target-arrow-shape': 'triangle', // 親から子への矢印
+                            'line-color': '#aaaaaa',
+                            'target-arrow-color': '#aaaaaa',
+                            'target-arrow-shape': 'triangle',
                             'curve-style': 'bezier'
                         }
                     }
                 ];
 
-                // 🏗️ Cytoscapeが動く形にデータを組み立て直す
+                // 🏗️ Cytoscape設定の組み立て
                 const cleanConfig = {
                     container: document.getElementById('cy'),
                     elements: rawElements,
                     style: defaultStylesheet,
                     layout: {
-                        name: 'cose', // 自動できれいに家系図を分散・整理して配置するレイアウト
-                        animate: false
+                        name: 'cose', // 綺麗に自動分散させるレイアウト
+                        animate: false,
+                        refresh: 20,
+                        fit: true
                     }
                 };
 
                 // グラフを描画
                 const cy = cytoscape(cleanConfig);
 
-                // 画面中央にピタッと収める
-                cy.fit();
-                cy.center();
+                // 強制的に再フィット＆中央配置
+                setTimeout(() => {
+                    cy.fit();
+                    cy.center();
+                }, 200);
 
                 console.log("クリーンアップ後の描画を実行しました。要素数:", cy.elements().length);
 
