@@ -35,15 +35,15 @@
             const config = cytoscapeConfig || {};
             const configProps = config.props || {};
 
-            // 1. エレメント（ノード・エッジ）の抽出
+            // 1. エレメントデータの抽出
             let rawElements = configProps.elements || config.elements || [];
 
-            // 2. スタイルシートの抽出と、優先度（詳細度）の強制引き上げ処理
+            // 2. スタイルシートの抽出と、純粋なJavaScript版への形式変換
             let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
-            let convertedStylesheet = [];
+            let convertedStyle = [];
 
             if (Array.isArray(rawStylesheet)) {
-                convertedStylesheet = rawStylesheet.map((item, index) => {
+                convertedStyle = rawStylesheet.map(item => {
                     let dashStyle = item.style || item.css || {};
 
                     if (typeof dashStyle === 'string') {
@@ -54,28 +54,14 @@
                     Object.keys(dashStyle).forEach(key => {
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
 
-                        // content を label に変換
+                        // Dash特有の「content」を、本家JSが認識できる「label」に変換
                         if (kebabKey === 'content') kebabKey = 'label';
 
                         finalStyle[kebabKey] = dashStyle[key];
                     });
 
-                    // 【今回の最重要ポイント：セレクタ優先度の引き上げ】
-                    let cleanSelector = item.selector.trim();
-
-                    // 空白区切りをドットに置換 (例: ".edge tt25" -> ".edge.tt25")
-                    cleanSelector = cleanSelector.replace(/\s+/g, '.');
-
-                    // 本家Cytoscape.jsの内部デフォルトスタイルに打ち勝つため、
-                    // 全てのセレクタの先頭にノード/エッジ識別か、全要素ワイルドカード `*` を結合し、
-                    // さらに「後から読み込まれたスタイル」として優先度を最大化します。
-                    if (cleanSelector.includes('edge')) {
-                        cleanSelector = 'edge' + cleanSelector;
-                    } else if (cleanSelector.includes('node') || cleanSelector.includes('conn') || cleanSelector.includes('self')) {
-                        cleanSelector = 'node' + cleanSelector;
-                    } else {
-                        cleanSelector = '*' + cleanSelector;
-                    }
+                    // 複数クラスの空白をドットに補正
+                    let cleanSelector = item.selector.trim().replace(/\s+/g, '.');
 
                     return {
                         selector: cleanSelector,
@@ -88,9 +74,12 @@
             const cy = cytoscape({
                 container: document.getElementById('cy'),
                 elements: rawElements,
-                stylesheet: convertedStylesheet, // 優先度を限界突破させたスタイル
+
+                // 【最重要修正】本家JavaScript版のプロパティ名は「style」です！
+                style: convertedStyle,
+
                 layout: {
-                    name: 'preset'  // Python側の座標(position)をそのまま使用
+                    name: 'preset'  // Python側の座標(position)を完全固定
                 },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
