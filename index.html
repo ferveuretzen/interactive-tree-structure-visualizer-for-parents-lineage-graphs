@@ -3,70 +3,25 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Pages - Cytoscape Graph</title>
-
-    <!-- 1. ネットワーク図を描画するためのライブラリを読み込み -->
-    <script src="https://cloudflare.com"></script>
-
-    <!-- 2. PythonからダンプしたJSファイルを読み込み（github.io上で正常に連動します） -->
-    <script src="graph_config.js"></script>
-
-    <style>
-        /* 画面全体にグラフを広げるためのスタイル設定 */
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #ffffff;
-        }
-
-        #cy {
-            position: absolute;
-            top: 0;
-            left: 0;
-            /* 万が一Python側でサイズ指定が漏れていた場合の保険 */
-            width: 100vw;
-            height: 100vh;
-        }
-    </style>
+    <title>Plotly グラフ表示</title>
+    <!-- Plotly.js（グラフ描画ライブラリ）を読み込む -->
+    <script src="https://plot.ly" charset="utf-8"></script>
 </head>
 
 <body>
 
-    <!-- 3. グラフを表示するコンテナ要素 -->
-    <div id="cy"></div>
+    <!-- グラフを表示するための枠（コンテナ） -->
+    <div id="my-graph" style="width:100%; height:100vh;"></div>
+
+    <!-- 設定ファイルを読み込む -->
+    <script src="graph_config.js"></script>
 
     <script>
-        // 4. HTMLと外部JS（graph_config.js）の読み込みが完全に終わったら実行
-        window.addEventListener('load', () => {
-
-            // ダンプデータ（cytoscapeConfig.props）に安全にアクセス
-            if (typeof cytoscapeConfig === 'undefined' || !cytoscapeConfig.props) {
-                console.error("エラー: graph_config.js が正しく読み込めていないか、データ構造が異なります。");
-                return;
-            }
-
-            const config = cytoscapeConfig.props;
-            const cyContainer = document.getElementById('cy');
-
-            if (config.style) {
-                Object.assign(cyContainer.style, config.style);
-            }
-
-            var cy = cytoscape({
-                container: cyContainer,
-                elements: config.elements,
-                style: config.stylesheet,
-                layout: config.layout
-            });
-
-            if (config.layout) {
-                cy.layout(config.layout).run();
-            }
-            cy.fit();
-        });
+        // graph_config.js 内で定義されている変数（例: data, layout）を使ってグラフを描画
+        // ※変数名は graph_config.js の記述に合わせて「graphData」などに適宜変更してください
+        Plotly.newPlot('my-graph', data, layout);
     </script>
+
 </body>
 
 </html>
