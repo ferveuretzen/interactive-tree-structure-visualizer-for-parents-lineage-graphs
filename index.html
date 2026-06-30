@@ -35,32 +35,38 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const configProps = cytoscapeConfig.props || {};
+            const config = cytoscapeConfig || {};
+            const configProps = config.props || {};
 
-            // Dash Cytoscape のスタイルシートを JS（Cytoscape.js）形式に徹底変換
+            // 1. エレメント（ノード・エッジ）のクラス名（スペース区切り）をJSが認識できる配列に変換
+            let rawElements = configProps.elements || config.elements || [];
+            let convertedElements = rawElements.map(item => {
+                if (item.classes && typeof item.classes === 'string') {
+                    // "edge tt25" を ["edge", "tt25"] のように配列に分解
+                    item.classes = item.classes.trim().split(/\s+/);
+                }
+                return item;
+            });
+
+            // 2. スタイルシートの抽出（propsの中、または直下の両方に対応）
+            let rawStylesheet = configProps.stylesheet || config.stylesheet || [];
             let convertedStylesheet = [];
-            if (Array.isArray(configProps.stylesheet)) {
-                convertedStylesheet = configProps.stylesheet.map(item => {
+
+            if (Array.isArray(rawStylesheet)) {
+                convertedStylesheet = rawStylesheet.map(item => {
                     let rawStyle = item.style || item.css || {};
 
-                    // 【重要】もし style が文字列（JSON文字列）になっていたらオブジェクトに変換する
+                    // 文字列（JSON）になっていた場合はオブジェクトにパース
                     if (typeof rawStyle === 'string') {
-                        try {
-                            rawStyle = JSON.parse(rawStyle);
-                        } catch (e) {
-                            console.error("Stylesのパースに失敗しました:", e);
-                            rawStyle = {};
-                        }
+                        try { rawStyle = JSON.parse(rawStyle); } catch (e) { rawStyle = {}; }
                     }
 
                     const finalStyle = {};
-
-                    // キー名と値の補正
                     Object.keys(rawStyle).forEach(key => {
-                        // キャメルケース（curveStyle）をケバブケース（curve-style）に変換
+                        // キャメルケースをケバブケースに変換 (curveStyle -> curve-style)
                         let kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
 
-                        // Dashの「content」をJSの「label」に変換
+                        // Dashの content を JSの label に変換（文字化けのないようそのまま渡す）
                         if (kebabKey === 'content') kebabKey = 'label';
 
                         finalStyle[kebabKey] = rawStyle[key];
@@ -73,13 +79,13 @@
                 });
             }
 
-            // グラフの描画を実行
+            // 3. グラフの描画を実行
             cytoscape({
                 container: document.getElementById('cy'),
-                elements: configProps.elements || [],
-                stylesheet: convertedStylesheet, // デコード済みのスタイルシートを適用
+                elements: convertedElements,       // クラス名を最適化したエレメント
+                stylesheet: convertedStylesheet,   // パース完了したスタイル
                 layout: {
-                    name: 'preset'
+                    name: 'preset'                 // Python側の座標(position)を完全固定
                 },
                 zoomingEnabled: true,
                 userZoomingEnabled: true,
