@@ -1,4 +1,4 @@
-# インタラクティブ家系図生成プログラム (Interactive Tree Structure Visualizer)
+# 対話型家系図生成プログラム (Interactive Tree Structure Visualizer)
 
 生成AIによるテキスト解析と、Python（Dash Cytoscape）による動的描画を組み合わせた、インタラクティブなネットワーク構造可視化アプリケーションです。
 
