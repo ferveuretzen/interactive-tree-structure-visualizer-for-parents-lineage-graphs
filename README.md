@@ -2,7 +2,9 @@
 
 生成AIによるテキスト解析と、Python（Dash Cytoscape）による動的描画を組み合わせた、インタラクティブなネットワーク構造可視化アプリケーションです。
 
-## 🌐 デモサイト
+## 🌐 デモ
+https://github.com/user-attachments/assets/c6f9ef00-6020-4829-b218-572fbdeb8cab
+
 - **Web表示（フロントエンド部）**: [GitHub Pages デモサイト](https://ferveuretzen.github.io/interactive-tree-structure-visualizer-for-parents-lineage-graphs/)
 ※ライセンスおよびセキュリティの都合上、デモサイトではフロントエンドの描画・操作機能のみを公開しています。ローカル環境（MacBook）では、Gemini APIと連携したリアルタイムなAI解析・自動描画デモが可能です。
 
